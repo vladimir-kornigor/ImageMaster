@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0d1117">
+  <title>ImageMaster</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <h1 class="logo">ImageMaster</h1>
+  </header>
+
+  <main class="main">
+    <section class="section">
+      <h2 class="section-title">Целевой формат</h2>
+      <select id="format" class="select" aria-label="Формат">
+        <option value="1">Квадрат (1:1)</option>
+        <option value="0.75">Вертикальный (3:4)</option>
+        <option value="0.5625">Сторис (9:16)</option>
+        <option value="custom">Свой формат</option>
+      </select>
+      <div id="custom-ratio" class="custom-ratio" hidden>
+        <input type="text" id="ratio-w" class="input" placeholder="Ширина" inputmode="decimal">
+        <span class="ratio-sep">:</span>
+        <input type="text" id="ratio-h" class="input" placeholder="Высота" inputmode="decimal">
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Фон (padding)</h2>
+      <div class="segmented" role="group" aria-label="Фон">
+        <button type="button" class="segmented-btn active" data-bg="white">Белый</button>
+        <button type="button" class="segmented-btn" data-bg="black">Черный</button>
+        <button type="button" class="segmented-btn" data-bg="blur">Размытый</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Изображения</h2>
+      <label class="file-label">
+        <input type="file" id="files" class="file-input" accept="image/*" multiple>
+        <span class="file-button">Выбрать фото</span>
+      </label>
+      <p id="file-count" class="hint" aria-live="polite"></p>
+      <div id="thumbs" class="thumbs"></div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Превью</h2>
+      <div class="preview-wrap">
+        <canvas id="preview" class="preview-canvas" width="360" height="220"></canvas>
+        <p id="preview-placeholder" class="preview-placeholder">Нет превью</p>
+      </div>
+    </section>
+
+    <button type="button" id="start" class="btn btn-primary">Старт</button>
+    <p id="status" class="status" aria-live="polite"></p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
