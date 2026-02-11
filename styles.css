@@ -283,6 +283,16 @@ body {
   min-height: 1.25em;
 }
 
+.save-hint {
+  margin-top: 16px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.save-hint strong {
+  color: var(--accent);
+}
+
 /* iPhone 14 Pro: 393×852 pt, безопасные отступы */
 @media (max-width: 430px) {
   .main {

@@ -188,15 +188,13 @@
     URL.revokeObjectURL(a.href);
   }
 
-  function canShareFile() {
-    return navigator.share && navigator.canShare && typeof navigator.canShare === 'function';
-  }
-
-  function shareImageToPhotos(blob, name) {
-    if (!canShareFile()) return Promise.resolve(false);
-    var file = new File([blob], name, { type: 'image/jpeg' });
-    if (!navigator.canShare({ files: [file] })) return Promise.resolve(false);
-    return navigator.share({ files: [file], title: 'ImageMaster' }).then(function () { return true; }, function () { return false; });
+  function canShareFiles(filesArray) {
+    if (!navigator.share || !navigator.canShare) return false;
+    try {
+      return navigator.canShare({ files: filesArray });
+    } catch (e) {
+      return false;
+    }
   }
 
   function processAll() {
@@ -211,15 +209,14 @@
     }
 
     startBtn.disabled = true;
-    setStatus('Обработка…');
-    var done = 0;
+    setStatus('Обработка всех фото…');
     var total = files.length;
-    var useShare = canShareFile();
+    var results = [];
+    var processed = 0;
 
     function tryNext(i) {
       if (i >= total) {
-        startBtn.disabled = false;
-        setStatus(useShare ? 'Готово. Сохранено в Фото: ' + done : 'Готово. Скачано: ' + done);
+        finishProcess();
         return;
       }
       var file = files[i];
@@ -243,15 +240,13 @@
       var file = files[i];
       var img = file._img;
       if (!img) {
-        done++;
-        setStatus('Обработано ' + done + ' из ' + total);
+        setStatus('Обработано ' + (processed + 1) + ' из ' + total);
         next(i + 1);
         return;
       }
       var canvas = drawResult(img, ratio, bgMode);
       if (!canvas) {
-        done++;
-        setStatus('Обработано ' + done + ' из ' + total);
+        setStatus('Обработано ' + (processed + 1) + ' из ' + total);
         next(i + 1);
         return;
       }
@@ -262,30 +257,47 @@
 
       canvas.toBlob(
         function (blob) {
-          if (!blob) {
-            setStatus('Обработано ' + (done + 1) + ' из ' + total);
-            next(i + 1);
-            return;
+          if (blob) {
+            results.push(new File([blob], name, { type: 'image/jpeg' }));
+            processed++;
           }
-          setStatus(useShare ? 'Сохраните в Фото (' + (done + 1) + '/' + total + ')…' : 'Обработано ' + (done + 1) + ' из ' + total);
-
-          if (useShare) {
-            shareImageToPhotos(blob, name).then(function (shared) {
-              if (!shared) downloadBlob(blob, name);
-              done += 1;
-              setStatus(shared ? 'Сохранено в Фото: ' + done + ' из ' + total : 'Обработано ' + done + ' из ' + total);
-              next(i + 1);
-            });
-          } else {
-            downloadBlob(blob, name);
-            done += 1;
-            setStatus('Обработано ' + done + ' из ' + total);
-            next(i + 1);
-          }
+          setStatus('Обработано ' + processed + ' из ' + total);
+          next(i + 1);
         },
         'image/jpeg',
         0.92
       );
+    }
+
+    function finishProcess() {
+      if (results.length === 0) {
+        startBtn.disabled = false;
+        setStatus('Нет обработанных фото.');
+        return;
+      }
+      setStatus('Готово. Сохраняю в Фото…');
+
+      if (canShareFiles(results)) {
+        navigator.share({ files: results, title: 'ImageMaster' })
+          .then(function () {
+            setStatus('Все ' + results.length + ' фото сохранены в приложение «Фото».');
+          })
+          .catch(function (err) {
+            if (err.name !== 'AbortError') {
+              setStatus('Меню отменено. Скачиваю ' + results.length + ' файлов…');
+              results.forEach(function (f) { downloadBlob(f, f.name); });
+            } else {
+              setStatus('Отменено.');
+            }
+          })
+          .then(function () {
+            startBtn.disabled = false;
+          });
+      } else {
+        results.forEach(function (f) { downloadBlob(f, f.name); });
+        setStatus('Скачано: ' + results.length + ' файлов.');
+        startBtn.disabled = false;
+      }
     }
 
     tryNext(0);
