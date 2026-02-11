@@ -180,14 +180,6 @@
     updatePreview();
   }
 
-  function downloadBlob(blob, name) {
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
   function canShareFiles(filesArray) {
     if (!navigator.share || !navigator.canShare) return false;
     try {
@@ -280,22 +272,20 @@
       if (canShareFiles(results)) {
         navigator.share({ files: results, title: 'ImageMaster' })
           .then(function () {
-            setStatus('Все ' + results.length + ' фото сохранены в приложение «Фото».');
+            setStatus('Все ' + results.length + ' фото сохранены в «Фото».');
           })
           .catch(function (err) {
-            if (err.name !== 'AbortError') {
-              setStatus('Меню отменено. Скачиваю ' + results.length + ' файлов…');
-              results.forEach(function (f) { downloadBlob(f, f.name); });
-            } else {
+            if (err.name === 'AbortError') {
               setStatus('Отменено.');
+            } else {
+              setStatus('Ошибка. Попробуйте снова.');
             }
           })
           .then(function () {
             startBtn.disabled = false;
           });
       } else {
-        results.forEach(function (f) { downloadBlob(f, f.name); });
-        setStatus('Скачано: ' + results.length + ' файлов.');
+        setStatus('Сохранение в «Фото» доступно в Safari на iPhone. Откройте страницу на устройстве.');
         startBtn.disabled = false;
       }
     }
