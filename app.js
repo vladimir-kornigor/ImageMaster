@@ -181,11 +181,22 @@
   }
 
   function downloadBlob(blob, name) {
-    const a = document.createElement('a');
+    var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  function canShareFile() {
+    return navigator.share && navigator.canShare && typeof navigator.canShare === 'function';
+  }
+
+  function shareImageToPhotos(blob, name) {
+    if (!canShareFile()) return Promise.resolve(false);
+    var file = new File([blob], name, { type: 'image/jpeg' });
+    if (!navigator.canShare({ files: [file] })) return Promise.resolve(false);
+    return navigator.share({ files: [file], title: 'ImageMaster' }).then(function () { return true; }, function () { return false; });
   }
 
   function processAll() {
@@ -203,9 +214,14 @@
     setStatus('Обработка…');
     var done = 0;
     var total = files.length;
+    var useShare = canShareFile();
 
     function tryNext(i) {
-      if (i >= total) return;
+      if (i >= total) {
+        startBtn.disabled = false;
+        setStatus(useShare ? 'Готово. Сохранено в Фото: ' + done : 'Готово. Скачано: ' + done);
+        return;
+      }
       var file = files[i];
       var img = file._img;
       if (!img || !img.complete) {
@@ -229,38 +245,43 @@
       if (!img) {
         done++;
         setStatus('Обработано ' + done + ' из ' + total);
-        if (done === total) {
-          startBtn.disabled = false;
-          setStatus('Готово. Сохранено: ' + done);
-        }
         next(i + 1);
         return;
       }
       var canvas = drawResult(img, ratio, bgMode);
       if (!canvas) {
         done++;
-        if (done === total) {
-          startBtn.disabled = false;
-          setStatus('Готово. Сохранено: ' + done);
-        }
+        setStatus('Обработано ' + done + ' из ' + total);
         next(i + 1);
         return;
       }
+      var base = file.name.replace(/\.[^.]+$/, '');
+      var ext = file.name.match(/\.[^.]+$/);
+      ext = ext ? ext[0] : '.jpg';
+      var name = base + '_ratio' + canvas.width + 'x' + canvas.height + ext;
+
       canvas.toBlob(
         function (blob) {
-          if (blob) {
-            var base = file.name.replace(/\.[^.]+$/, '');
-            var ext = file.name.match(/\.[^.]+$/);
-            ext = ext ? ext[0] : '.jpg';
-            downloadBlob(blob, base + '_ratio' + canvas.width + 'x' + canvas.height + ext);
+          if (!blob) {
+            setStatus('Обработано ' + (done + 1) + ' из ' + total);
+            next(i + 1);
+            return;
           }
-          done += 1;
-          setStatus('Обработано ' + done + ' из ' + total);
-          if (done === total) {
-            startBtn.disabled = false;
-            setStatus('Готово. Сохранено: ' + done);
+          setStatus(useShare ? 'Сохраните в Фото (' + (done + 1) + '/' + total + ')…' : 'Обработано ' + (done + 1) + ' из ' + total);
+
+          if (useShare) {
+            shareImageToPhotos(blob, name).then(function (shared) {
+              if (!shared) downloadBlob(blob, name);
+              done += 1;
+              setStatus(shared ? 'Сохранено в Фото: ' + done + ' из ' + total : 'Обработано ' + done + ' из ' + total);
+              next(i + 1);
+            });
+          } else {
+            downloadBlob(blob, name);
+            done += 1;
+            setStatus('Обработано ' + done + ' из ' + total);
+            next(i + 1);
           }
-          next(i + 1);
         },
         'image/jpeg',
         0.92
