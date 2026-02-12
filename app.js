@@ -22,7 +22,7 @@
   let previewIndex = 0;
   let bgMode = 'white';
 
-  const PREVIEW_MAX = 360;
+  const PREVIEW_MAX = 600;
 
   function getTargetRatio() {
     const v = formatSelect.value;
@@ -40,21 +40,27 @@
   }
 
   function drawBlurredBackground(ctx, img, canvasW, canvasH) {
+    // Масштабируем изображение так, чтобы оно полностью перекрывало холст
     const scale = Math.max(canvasW / img.width, canvasH / img.height);
     const bigW = img.width * scale;
     const bigH = img.height * scale;
     const sx = (bigW - canvasW) / 2;
     const sy = (bigH - canvasH) / 2;
 
-    const smallW = Math.max(1, Math.floor(canvasW / 6));
-    const smallH = Math.max(1, Math.floor(canvasH / 6));
+    // Уменьшаем в 3 раза для мягкого размытия, затем растягиваем обратно
+    const smallW = Math.max(1, Math.floor(canvasW / 3));
+    const smallH = Math.max(1, Math.floor(canvasH / 3));
     const offscreen = document.createElement('canvas');
     offscreen.width = smallW;
     offscreen.height = smallH;
     const offCtx = offscreen.getContext('2d');
+
+    offCtx.imageSmoothingEnabled = true;
+    offCtx.imageSmoothingQuality = 'high';
     offCtx.drawImage(img, sx, sy, canvasW, canvasH, 0, 0, smallW, smallH);
+
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'low';
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(offscreen, 0, 0, smallW, smallH, 0, 0, canvasW, canvasH);
   }
 
@@ -105,18 +111,29 @@
       previewPlaceholder.hidden = false;
       return;
     }
-    var oldW = img.naturalWidth || img.width;
-    var oldH = img.naturalHeight || img.height;
-    var size = canvasSize(oldW, oldH, ratio);
-    var scale = Math.min(PREVIEW_MAX / size.width, 220 / size.height, 1);
-    var outW = Math.round(size.width * scale);
-    var outH = Math.round(size.height * scale);
-    var canvas = drawResult(img, ratio, bgMode, outW, outH);
-    if (!canvas) return;
+
+    // Рисуем изображение в полном разрешении, затем уменьшаем с высоким качеством
+    var baseCanvas = drawResult(img, ratio, bgMode);
+    if (!baseCanvas) {
+      previewCanvas.hidden = true;
+      previewPlaceholder.hidden = false;
+      return;
+    }
+
+    var maxW = PREVIEW_MAX;
+    var maxH = 360;
+    var scale = Math.min(maxW / baseCanvas.width, maxH / baseCanvas.height, 1);
+    var outW = Math.round(baseCanvas.width * scale);
+    var outH = Math.round(baseCanvas.height * scale);
+
     var ctx = previewCanvas.getContext('2d');
-    previewCanvas.width = canvas.width;
-    previewCanvas.height = canvas.height;
-    ctx.drawImage(canvas, 0, 0);
+    previewCanvas.width = outW;
+    previewCanvas.height = outH;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.clearRect(0, 0, outW, outH);
+    ctx.drawImage(baseCanvas, 0, 0, baseCanvas.width, baseCanvas.height, 0, 0, outW, outH);
+
     previewCanvas.hidden = false;
     previewPlaceholder.hidden = true;
   }
