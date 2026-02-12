@@ -180,6 +180,10 @@
     updatePreview();
   }
 
+  function isIOS() {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  }
+
   function canShareFiles(filesArray) {
     if (!navigator.share || !navigator.canShare) return false;
     try {
@@ -267,12 +271,12 @@
         setStatus('Нет обработанных фото.');
         return;
       }
-      setStatus('Готово. Сохраняю в Фото…');
+      setStatus('Сохранение…');
 
-      if (canShareFiles(results)) {
+      if (isIOS() && canShareFiles(results)) {
         navigator.share({ files: results, title: 'ImageMaster' })
           .then(function () {
-            setStatus('Все ' + results.length + ' фото сохранены в «Фото».');
+            setStatus('Все фото сохранены.');
           })
           .catch(function (err) {
             if (err.name === 'AbortError') {
@@ -285,7 +289,15 @@
             startBtn.disabled = false;
           });
       } else {
-        setStatus('Сохранение в «Фото» доступно в Safari на iPhone. Откройте страницу на устройстве.');
+        // Desktop или нет поддержки share: сохраняем в «Загрузки»
+        results.forEach(function (f) {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(f);
+          a.download = f.name;
+          a.click();
+          URL.revokeObjectURL(a.href);
+        });
+        setStatus('Все фото сохранены.');
         startBtn.disabled = false;
       }
     }
@@ -301,6 +313,33 @@
     loadFiles(this.files);
   });
   startBtn.addEventListener('click', processAll);
+
+  // Drag-and-drop support (desktop)
+  const dropZone = document.getElementById('drop-zone');
+  if (dropZone) {
+    ['dragenter', 'dragover'].forEach(function (eventName) {
+      dropZone.addEventListener(eventName, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('drop-active');
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      });
+    });
+
+    ['dragleave', 'dragend', 'drop'].forEach(function (eventName) {
+      dropZone.addEventListener(eventName, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('drop-active');
+      });
+    });
+
+    dropZone.addEventListener('drop', function (e) {
+      const dt = e.dataTransfer;
+      if (!dt || !dt.files || !dt.files.length) return;
+      loadFiles(dt.files);
+    });
+  }
 
   onFormatChange();
 })();
