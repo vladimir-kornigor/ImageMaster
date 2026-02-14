@@ -40,28 +40,61 @@
   }
 
   function drawBlurredBackground(ctx, img, canvasW, canvasH) {
-    // Масштабируем изображение так, чтобы оно полностью перекрывало холст
-    const scale = Math.max(canvasW / img.width, canvasH / img.height);
-    const bigW = img.width * scale;
-    const bigH = img.height * scale;
-    const sx = (bigW - canvasW) / 2;
-    const sy = (bigH - canvasH) / 2;
+    // Базовый тон, чтобы не было «пустых» зон при нестандартных пропорциях
+    const colorProbe = document.createElement('canvas');
+    colorProbe.width = 1;
+    colorProbe.height = 1;
+    const probeCtx = colorProbe.getContext('2d', { willReadFrequently: true });
+    probeCtx.drawImage(img, 0, 0, 1, 1);
+    const pixel = probeCtx.getImageData(0, 0, 1, 1).data;
+    ctx.fillStyle = 'rgb(' + pixel[0] + ', ' + pixel[1] + ', ' + pixel[2] + ')';
+    ctx.fillRect(0, 0, canvasW, canvasH);
 
-    // Уменьшаем в 3 раза для мягкого размытия, затем растягиваем обратно
-    const smallW = Math.max(1, Math.floor(canvasW / 3));
-    const smallH = Math.max(1, Math.floor(canvasH / 3));
-    const offscreen = document.createElement('canvas');
-    offscreen.width = smallW;
-    offscreen.height = smallH;
-    const offCtx = offscreen.getContext('2d');
+    // Вписываем исходник, чтобы оттенки расходились к краям равномерно со всех сторон
+    const containScale = Math.min(canvasW / img.width, canvasH / img.height);
+    const containW = Math.max(1, Math.round(img.width * containScale));
+    const containH = Math.max(1, Math.round(img.height * containScale));
+    const containX = (canvasW - containW) / 2;
+    const containY = (canvasH - containH) / 2;
 
-    offCtx.imageSmoothingEnabled = true;
-    offCtx.imageSmoothingQuality = 'high';
-    offCtx.drawImage(img, sx, sy, canvasW, canvasH, 0, 0, smallW, smallH);
+    const layer = document.createElement('canvas');
+    layer.width = canvasW;
+    layer.height = canvasH;
+    const layerCtx = layer.getContext('2d');
+    layerCtx.fillStyle = ctx.fillStyle;
+    layerCtx.fillRect(0, 0, canvasW, canvasH);
+    layerCtx.imageSmoothingEnabled = true;
+    layerCtx.imageSmoothingQuality = 'high';
+    layerCtx.drawImage(img, 0, 0, img.width, img.height, containX, containY, containW, containH);
+
+    // Несколько проходов downscale/upscale дают мягкое и глубокое размытие
+    const passes = [4, 8, 12];
+    const work = document.createElement('canvas');
+    work.width = canvasW;
+    work.height = canvasH;
+    const workCtx = work.getContext('2d');
+    workCtx.drawImage(layer, 0, 0);
+
+    passes.forEach(function (divisor) {
+      const sw = Math.max(1, Math.floor(canvasW / divisor));
+      const sh = Math.max(1, Math.floor(canvasH / divisor));
+      const tiny = document.createElement('canvas');
+      tiny.width = sw;
+      tiny.height = sh;
+      const tinyCtx = tiny.getContext('2d');
+      tinyCtx.imageSmoothingEnabled = true;
+      tinyCtx.imageSmoothingQuality = 'high';
+      tinyCtx.drawImage(work, 0, 0, canvasW, canvasH, 0, 0, sw, sh);
+
+      workCtx.clearRect(0, 0, canvasW, canvasH);
+      workCtx.imageSmoothingEnabled = true;
+      workCtx.imageSmoothingQuality = 'high';
+      workCtx.drawImage(tiny, 0, 0, sw, sh, 0, 0, canvasW, canvasH);
+    });
 
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(offscreen, 0, 0, smallW, smallH, 0, 0, canvasW, canvasH);
+    ctx.drawImage(work, 0, 0, canvasW, canvasH);
   }
 
   function drawResult(sourceImage, targetRatio, bgMode, outputW, outputH) {
